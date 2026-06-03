@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nio CEP Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green-dark: #192B1C;
+    --green-mid: #32E000;
+    --green-light: #F0F5EB;
+    --white: #ffffff;
+    --near-black: #0e1a0f;
+    --muted: #6b7c6d;
+    --border: rgba(50,224,0,0.15);
+    --card-bg: rgba(25,43,28,0.6);
+  }
+
+  body {
+    background: var(--near-black);
+    color: var(--white);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(50,224,0,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(50,224,0,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--green-mid);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.05;
+    color: var(--white);
+  }
+
+  h1 span { color: var(--green-mid); }
+
+  .subtitle {
+    margin-top: 12px;
+    font-size: 15px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    backdrop-filter: blur(8px);
+    margin-bottom: 20px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--green-mid);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--green-mid);
+    background: rgba(50,224,0,0.04);
+  }
+
+  .upload-zone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+
+  .upload-label {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--white);
+    margin-bottom: 6px;
+  }
+
+  .upload-hint {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .file-selected {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: rgba(50,224,0,0.08);
+    border: 1px solid rgba(50,224,0,0.3);
+    border-radius: 8px;
+    margin-top: 16px;
+  }
+
+  .file-selected .fname {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--green-mid);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-selected .fsize {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat {
+    background: rgba(50,224,0,0.06);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--green-mid);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Progress */
+  .progress-wrap {
+    margin-bottom: 16px;
+  }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+
+  .progress-label {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .progress-pct {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--green-mid);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .progress-bar {
+    height: 6px;
+    background: rgba(50,224,0,0.1);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--green-mid);
+    border-radius: 99px;
+    transition: width 0.3s ease;
+    width: 0%;
+    box-shadow: 0 0 12px rgba(50,224,0,0.5);
+  }
+
+  /* Log */
+  .log {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    height: 160px;
+    overflow-y: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  .log-line { color: var(--muted); }
+  .log-line.ok { color: var(--green-mid); }
+  .log-line.warn { color: #f4b942; }
+  .log-line.err { color: #f44336; }
+  .log-line.info { color: var(--white); }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  button {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 12px 24px;
+    border-radius: 200px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-primary {
+    background: var(--green-mid);
+    color: var(--near-black);
+  }
+
+  .btn-primary:hover { background: #28c000; }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--white);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .btn-secondary:hover { border-color: var(--green-mid); color: var(--green-mid); }
+  .btn-secondary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-danger {
+    background: transparent;
+    color: #f44336;
+    border: 1px solid rgba(244,67,54,0.3);
+  }
+
+  .btn-danger:hover { background: rgba(244,67,54,0.1); }
+  .btn-danger:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Results */
+  .results-section { display: none; }
+  .results-section.visible { display: block; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 4px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 7px;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+    border: none;
+    background: transparent;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .tab.active {
+    background: var(--green-dark);
+    color: var(--green-mid);
+    border: 1px solid var(--border);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    max-height: 480px;
+    overflow-y: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    background: var(--green-dark);
+    color: var(--green-mid);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 12px 16px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  thead th:not(:first-child) { text-align: right; }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(50,224,0,0.06);
+    transition: background 0.1s;
+  }
+
+  tbody tr:hover { background: rgba(50,224,0,0.04); }
+
+  tbody td {
+    padding: 10px 16px;
+    color: var(--white);
+    font-family: 'DM Mono', monospace;
+  }
+
+  tbody td:not(:first-child):not(:nth-child(2)) { text-align: right; }
+
+  .badge-disp {
+    display: inline-block;
+    background: rgba(50,224,0,0.15);
+    color: var(--green-mid);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+
+  .badge-indisp {
+    display: inline-block;
+    background: rgba(244,67,54,0.12);
+    color: #f44336;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+
+  /* Download row */
+  .download-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* Hidden */
+  .hidden { display: none !important; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(50,224,0,0.2); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(50,224,0,0.4); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">Nio Internet · Analytics Tools</div>
+    <h1>CEP <span>Analyzer</span></h1>
+    <p class="subtitle">Processa CSVs exportados do GA4 e classifica consultas por cidade, estado e campanha via BrasilAPI.</p>
+  </header>
+
+  <!-- Upload -->
+  <div class="card" id="upload-card">
+    <div class="card-title">01 · Carregar arquivo</div>
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".csv">
+      <div class="upload-icon">📂</div>
+      <div class="upload-label">Solte o CSV aqui ou clique para selecionar</div>
+      <div class="upload-hint">Exportar de: Google Sheets → Arquivo → Fazer download → CSV</div>
+    </div>
+    <div class="file-selected hidden" id="file-info">
+      <span>✓</span>
+      <span class="fname" id="file-name"></span>
+      <span class="fsize" id="file-size"></span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="card hidden" id="stats-card">
+    <div class="card-title">02 · Resumo do arquivo</div>
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-label">Total linhas</div>
+        <div class="stat-value" id="st-total">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">gtmIds únicos</div>
+        <div class="stat-value" id="st-gtm">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">CEPs únicos</div>
+        <div class="stat-value" id="st-ceps">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Disponíveis</div>
+        <div class="stat-value" id="st-disp">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Indisponíveis</div>
+        <div class="stat-value" id="st-indisp">—</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="btn-start">▶ Iniciar processamento</button>
+      <button class="btn-secondary" id="btn-resume" style="display:none">↩ Retomar progresso salvo</button>
+      <button class="btn-danger" id="btn-clear-cache" style="display:none">✕ Limpar cache</button>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="card hidden" id="progress-card">
+    <div class="card-title">03 · Processando</div>
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-label">Processados</div>
+        <div class="stat-value" id="pr-done">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Restantes</div>
+        <div class="stat-value" id="pr-left">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Skips</div>
+        <div class="stat-value" id="pr-skip">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Vel. média</div>
+        <div class="stat-value" id="pr-speed">—</div>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-header">
+        <span class="progress-label" id="pr-label">Consultando BrasilAPI...</span>
+        <span class="progress-pct" id="pr-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="pr-fill"></div></div>
+    </div>
+    <div class="log" id="log"></div>
+    <div class="btn-row">
+      <button class="btn-danger" id="btn-stop">⏹ Pausar</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="results-section">
+    <div class="card">
+      <div class="card-title">04 · Resultados</div>
+      <div class="tabs">
+        <button class="tab active" data-tab="cidades">Cidades</button>
+        <button class="tab" data-tab="estados">Estados</button>
+        <button class="tab" data-tab="campanhas">Campanhas</button>
+      </div>
+
+      <div class="tab-content active" id="tab-cidades">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>UF</th><th>Cidade</th><th>Disponíveis</th><th>Indisponíveis</th></tr></thead>
+            <tbody id="tbody-cidades"></tbody>
+          </table>
+        </div>
+        <div class="download-row">
+          <button class="btn-secondary" onclick="downloadCSV('cidades')">⬇ CSV Cidades</button>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-estados">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>UF</th><th>Disponíveis</th><th>Indisponíveis</th></tr></thead>
+            <tbody id="tbody-estados"></tbody>
+          </table>
+        </div>
+        <div class="download-row">
+          <button class="btn-secondary" onclick="downloadCSV('estados')">⬇ CSV Estados</button>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-campanhas">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>UF</th><th>Cidade</th><th>Campanha</th><th>Consultas</th></tr></thead>
+            <tbody id="tbody-campanhas"></tbody>
+          </table>
+        </div>
+        <div class="download-row">
+          <button class="btn-secondary" onclick="downloadCSV('campanhas')">⬇ CSV Campanhas</button>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:24px; border-top:1px solid var(--border); padding-top:20px;">
+        <button class="btn-secondary" onclick="downloadCSV('all')">⬇ Baixar todos (ZIP)</button>
+        <button class="btn-danger" id="btn-reset">↺ Nova análise</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// Estado global
+// ============================================================
+const CACHE_KEY    = 'nio_cep_analyzer_v1';
+const PARALELO     = 50;
+const CHECKPOINT   = 100; // salva cache a cada N CEPs
+
+let csvRows       = [];
+let cepMap        = {}; // cep → { disp, indisp, campanhas }
+let acumCidades   = {};
+let acumCampanhas = {};
+let cepsUnicos    = [];
+let cepsFeitos    = 0;
+let cepsSkip      = 0;
+let rodando       = false;
+let startTime     = null;
+
+// ============================================================
+// Upload
+// ============================================================
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  handleFile(e.dataTransfer.files[0]);
+});
+
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if (!file || !file.name.endsWith('.csv')) {
+    alert('Por favor selecione um arquivo .csv');
+    return;
+  }
+
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-size').textContent = formatBytes(file.size);
+  document.getElementById('file-info').classList.remove('hidden');
+
+  const reader = new FileReader();
+  reader.onload = e => parseCSV(e.target.result);
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSV(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  // Pula cabeçalho (linha 0)
+  csvRows = lines.slice(1).map(line => {
+    // Split por vírgula respeitando aspas
+    const cols = splitCSVLine(line);
+    return { referrer: (cols[0] || '').trim(), urlRel: (cols[1] || '').trim() };
+  }).filter(r => r.urlRel);
+
+  // Deduplicação por gtmId
+  const gtmVistos = {};
+  cepMap = {};
+
+  csvRows.forEach(row => {
+    const gtmId = extrairParam(row.urlRel, 'gtmId');
+    if (!gtmId || gtmVistos[gtmId]) return;
+    gtmVistos[gtmId] = true;
+
+    const cep = extrairParam(row.urlRel, 'cep').replace(/\D/g, '');
+    if (cep.length !== 8) return;
+
+    const campanha   = extrairParam(row.referrer, 'utm_campaign') || '(não definido)';
+    const disponivel = row.urlRel.includes('/fibra-disponivel/');
+
+    if (!cepMap[cep]) cepMap[cep] = { disp: 0, indisp: 0, campanhas: {} };
+    if (disponivel) cepMap[cep].disp++;
+    else            cepMap[cep].indisp++;
+    if (!cepMap[cep].campanhas[campanha]) cepMap[cep].campanhas[campanha] = 0;
+    cepMap[cep].campanhas[campanha]++;
+  });
+
+  cepsUnicos = Object.keys(cepMap);
+
+  const totalDisp   = Object.values(cepMap).reduce((a, c) => a + c.disp, 0);
+  const totalIndisp = Object.values(cepMap).reduce((a, c) => a + c.indisp, 0);
+
+  document.getElementById('st-total').textContent  = csvRows.length.toLocaleString('pt-BR');
+  document.getElementById('st-gtm').textContent    = Object.keys(gtmVistos).length.toLocaleString('pt-BR');
+  document.getElementById('st-ceps').textContent   = cepsUnicos.length.toLocaleString('pt-BR');
+  document.getElementById('st-disp').textContent   = totalDisp.toLocaleString('pt-BR');
+  document.getElementById('st-indisp').textContent = totalIndisp.toLocaleString('pt-BR');
+
+  document.getElementById('stats-card').classList.remove('hidden');
+
+  // Verifica cache salvo
+  const cache = loadCache();
+  if (cache && cache.cepsFeitos > 0) {
+    document.getElementById('btn-resume').style.display = 'inline-block';
+    document.getElementById('btn-clear-cache').style.display = 'inline-block';
+    log(`Cache encontrado: ${cache.cepsFeitos} CEPs já processados.`, 'warn');
+  }
+}
+
+// ============================================================
+// Processamento
+// ============================================================
+document.getElementById('btn-start').addEventListener('click', () => iniciar(false));
+document.getElementById('btn-resume').addEventListener('click', () => iniciar(true));
+document.getElementById('btn-stop').addEventListener('click', pausar);
+document.getElementById('btn-reset').addEventListener('click', resetar);
+document.getElementById('btn-clear-cache').addEventListener('click', () => {
+  localStorage.removeItem(CACHE_KEY);
+  document.getElementById('btn-resume').style.display = 'none';
+  document.getElementById('btn-clear-cache').style.display = 'none';
+  log('Cache limpo.', 'warn');
+});
+
+async function iniciar(retomar) {
+  if (retomar) {
+    const cache = loadCache();
+    if (cache) {
+      acumCidades   = cache.acumCidades   || {};
+      acumCampanhas = cache.acumCampanhas || {};
+      cepsFeitos    = cache.cepsFeitos    || 0;
+      cepsSkip      = cache.cepsSkip      || 0;
+      log(`Retomando de ${cepsFeitos} CEPs processados...`, 'info');
+    }
+  } else {
+    acumCidades   = {};
+    acumCampanhas = {};
+    cepsFeitos    = 0;
+    cepsSkip      = 0;
+    localStorage.removeItem(CACHE_KEY);
+  }
+
+  rodando   = true;
+  startTime = Date.now() - (cepsFeitos * 200); // estima tempo já gasto
+
+  document.getElementById('stats-card').classList.add('hidden');
+  document.getElementById('progress-card').classList.remove('hidden');
+  document.getElementById('results-section').classList.remove('visible');
+
+  await processar();
+}
+
+async function processar() {
+  const total     = cepsUnicos.length;
+  const pendentes = cepsUnicos.slice(cepsFeitos);
+
+  for (let i = 0; i < pendentes.length && rodando; i += PARALELO) {
+    const grupo   = pendentes.slice(i, i + PARALELO);
+    const results = await Promise.allSettled(grupo.map(cep => buscarCEP(cep)));
+
+    results.forEach((res, idx) => {
+      const cep    = grupo[idx];
+      const counts = cepMap[cep];
+
+      if (res.status === 'fulfilled' && res.value) {
+        const info = res.value;
+        acumularDados(info, counts);
+        cepsFeitos++;
+      } else {
+        cepsSkip++;
+        cepsFeitos++;
+      }
+    });
+
+    // Atualiza UI
+    const pct   = Math.round((cepsFeitos / total) * 100);
+    const speed = cepsFeitos / ((Date.now() - startTime) / 1000);
+
+    document.getElementById('pr-fill').style.width  = pct + '%';
+    document.getElementById('pr-pct').textContent   = pct + '%';
+    document.getElementById('pr-done').textContent  = cepsFeitos.toLocaleString('pt-BR');
+    document.getElementById('pr-left').textContent  = (total - cepsFeitos).toLocaleString('pt-BR');
+    document.getElementById('pr-skip').textContent  = cepsSkip.toLocaleString('pt-BR');
+    document.getElementById('pr-speed').textContent = Math.round(speed) + '/s';
+
+    const grupo_num = Math.ceil((i + PARALELO) / PARALELO);
+    const total_grp = Math.ceil(pendentes.length / PARALELO);
+    log(`Grupo ${grupo_num}/${total_grp} — ${cepsFeitos}/${total} CEPs | ${cepsSkip} skips`, 'ok');
+
+    // Checkpoint
+    if (cepsFeitos % CHECKPOINT === 0) {
+      saveCache();
+    }
+  }
+
+  if (rodando) {
+    // Concluído
+    saveCache();
+    log('✓ Processamento concluído!', 'info');
+    document.getElementById('pr-label').textContent = '✓ Concluído!';
+    renderResultados();
+    document.getElementById('results-section').classList.add('visible');
+  }
+}
+
+async function buscarCEP(cep) {
+  // Tenta v2
+  try {
+    const r = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`, { signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.city && j.state) return { cidade: j.city, uf: j.state };
+    }
+  } catch(e) {}
+
+  // Fallback v1
+  try {
+    const r = await fetch(`https://brasilapi.com.br/api/cep/v1/${cep}`, { signal: AbortSignal.timeout(8000) });
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.city && j.state) return { cidade: j.city, uf: j.state };
+    }
+  } catch(e) {}
+
+  return null;
+}
+
+function pausar() {
+  rodando = false;
+  saveCache();
+  log('⏸ Pausado. Progresso salvo.', 'warn');
+  document.getElementById('btn-stop').disabled = true;
+  document.getElementById('pr-label').textContent = 'Pausado — progresso salvo no cache.';
+  // Mostra botão retomar
+  document.getElementById('stats-card').classList.remove('hidden');
+  document.getElementById('btn-resume').style.display = 'inline-block';
+}
+
+// ============================================================
+// Acumulador
+// ============================================================
+function acumularDados(info, counts) {
+  const chaveC = `${info.uf}|${info.cidade}`;
+  if (!acumCidades[chaveC]) acumCidades[chaveC] = { uf: info.uf, cidade: info.cidade, disp: 0, indisp: 0 };
+  acumCidades[chaveC].disp   += counts.disp;
+  acumCidades[chaveC].indisp += counts.indisp;
+
+  for (const campanha in counts.campanhas) {
+    const chaveK = `${info.uf}|${info.cidade}|${campanha}`;
+    if (!acumCampanhas[chaveK]) acumCampanhas[chaveK] = { uf: info.uf, cidade: info.cidade, campanha, consultas: 0 };
+    acumCampanhas[chaveK].consultas += counts.campanhas[campanha];
+  }
+}
+
+// ============================================================
+// Cache
+// ============================================================
+function saveCache() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      cepsFeitos, cepsSkip, acumCidades, acumCampanhas,
+      savedAt: new Date().toISOString()
+    }));
+  } catch(e) { log('Erro ao salvar cache: ' + e.message, 'err'); }
+}
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+// ============================================================
+// Resultados
+// ============================================================
+function renderResultados() {
+  // Cidades
+  const cidades = Object.values(acumCidades)
+    .sort((a, b) => (b.disp + b.indisp) - (a.disp + a.indisp));
+
+  const tbCidades = document.getElementById('tbody-cidades');
+  tbCidades.innerHTML = cidades.map(r => `
+    <tr>
+      <td>${r.uf}</td>
+      <td>${r.cidade}</td>
+      <td><span class="badge-disp">${r.disp.toLocaleString('pt-BR')}</span></td>
+      <td><span class="badge-indisp">${r.indisp.toLocaleString('pt-BR')}</span></td>
+    </tr>`).join('');
+
+  // Estados
+  const estados = {};
+  cidades.forEach(r => {
+    if (!estados[r.uf]) estados[r.uf] = { uf: r.uf, disp: 0, indisp: 0 };
+    estados[r.uf].disp   += r.disp;
+    estados[r.uf].indisp += r.indisp;
+  });
+
+  const estadosArr = Object.values(estados).sort((a, b) => (b.disp + b.indisp) - (a.disp + a.indisp));
+  const tbEstados  = document.getElementById('tbody-estados');
+  tbEstados.innerHTML = estadosArr.map(r => `
+    <tr>
+      <td>${r.uf}</td>
+      <td><span class="badge-disp">${r.disp.toLocaleString('pt-BR')}</span></td>
+      <td><span class="badge-indisp">${r.indisp.toLocaleString('pt-BR')}</span></td>
+    </tr>`).join('');
+
+  // Campanhas
+  const campanhas = Object.values(acumCampanhas)
+    .sort((a, b) => b.consultas - a.consultas);
+
+  const tbCampanhas = document.getElementById('tbody-campanhas');
+  tbCampanhas.innerHTML = campanhas.map(r => `
+    <tr>
+      <td>${r.uf}</td>
+      <td>${r.cidade}</td>
+      <td>${r.campanha}</td>
+      <td>${r.consultas.toLocaleString('pt-BR')}</td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// Tabs
+// ============================================================
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ============================================================
+// Download CSV
+// ============================================================
+function downloadCSV(tipo) {
+  if (tipo === 'all') {
+    downloadCSV('cidades');
+    setTimeout(() => downloadCSV('estados'), 300);
+    setTimeout(() => downloadCSV('campanhas'), 600);
+    return;
+  }
+
+  let rows, filename, header;
+
+  if (tipo === 'cidades') {
+    header   = 'UF,Cidade,Disponíveis,Indisponíveis';
+    filename = 'nio_cidades.csv';
+    rows     = Object.values(acumCidades)
+      .sort((a, b) => (b.disp + b.indisp) - (a.disp + a.indisp))
+      .map(r => `${r.uf},"${r.cidade}",${r.disp},${r.indisp}`);
+  } else if (tipo === 'estados') {
+    header   = 'UF,Disponíveis,Indisponíveis';
+    filename = 'nio_estados.csv';
+    const est = {};
+    Object.values(acumCidades).forEach(r => {
+      if (!est[r.uf]) est[r.uf] = { disp: 0, indisp: 0 };
+      est[r.uf].disp   += r.disp;
+      est[r.uf].indisp += r.indisp;
+    });
+    rows = Object.entries(est)
+      .sort((a, b) => (b[1].disp + b[1].indisp) - (a[1].disp + a[1].indisp))
+      .map(([uf, v]) => `${uf},${v.disp},${v.indisp}`);
+  } else {
+    header   = 'UF,Cidade,Campanha,Consultas';
+    filename = 'nio_campanhas.csv';
+    rows     = Object.values(acumCampanhas)
+      .sort((a, b) => b.consultas - a.consultas)
+      .map(r => `${r.uf},"${r.cidade}","${r.campanha}",${r.consultas}`);
+  }
+
+  const csv  = [header, ...rows].join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// Reset
+// ============================================================
+function resetar() {
+  rodando       = false;
+  csvRows       = [];
+  cepMap        = {};
+  acumCidades   = {};
+  acumCampanhas = {};
+  cepsUnicos    = [];
+  cepsFeitos    = 0;
+  cepsSkip      = 0;
+  localStorage.removeItem(CACHE_KEY);
+
+  document.getElementById('stats-card').classList.add('hidden');
+  document.getElementById('progress-card').classList.add('hidden');
+  document.getElementById('results-section').classList.remove('visible');
+  document.getElementById('file-info').classList.add('hidden');
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('pr-fill').style.width = '0%';
+  document.getElementById('pr-pct').textContent = '0%';
+  fileInput.value = '';
+}
+
+// ============================================================
+// Utilitários
+// ============================================================
+function extrairParam(url, param) {
+  try {
+    const base = url.startsWith('http') ? url : 'https://x.com' + url;
+    return new URL(base).searchParams.get(param) || '';
+  } catch(e) {
+    const m = url.match(new RegExp('[?&]' + param + '=([^&]+)'));
+    return m ? m[1] : '';
+  }
+}
+
+function splitCSVLine(line) {
+  const result = [];
+  let cur = '', inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQuote = !inQuote; }
+    else if (ch === ',' && !inQuote) { result.push(cur); cur = ''; }
+    else { cur += ch; }
+  }
+  result.push(cur);
+  return result;
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function log(msg, type = 'log') {
+  const el   = document.getElementById('log');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + type;
+  line.textContent = new Date().toLocaleTimeString('pt-BR') + ' › ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+</script>
+</body>
+</html>
